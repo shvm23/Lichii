@@ -5,10 +5,11 @@ on:
   workflow_dispatch:
     inputs:
       build_type:
-        description: Gradle build type
+        description: Build configuration
         type: choice
         options:
           - Release
+          - RelWithDebInfo
           - Debug
         default: Release
 
@@ -17,9 +18,9 @@ permissions:
 
 jobs:
   apk:
-    name: Android ARM64 APK
+    name: Lichii Android ARM64
     runs-on: ubuntu-24.04
-    timeout-minutes: 100
+    timeout-minutes: 120
 
     steps:
       - name: Checkout repository and submodules
@@ -34,51 +35,50 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platforms;android-36
+            build-tools;36.0.0
+            ndk;28.2.13676358
+            cmake;3.31.5
+
+      - name: Configure Android environment
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.2.13676358" >> $GITHUB_ENV
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Locate Android project
+      - name: Build Lichii Android
         shell: bash
         run: |
-          if [ -f src/android/gradlew ]; then
-            echo "ANDROID_DIR=src/android" >> "$GITHUB_ENV"
-          elif [ -f android/gradlew ]; then
-            echo "ANDROID_DIR=android" >> "$GITHUB_ENV"
-          elif [ -f gradlew ]; then
-            echo "ANDROID_DIR=." >> "$GITHUB_ENV"
-          else
-            echo "ERROR: No Android Gradle project found"
-            exit 1
-          fi
+          chmod +x .ci/android/build.sh
 
-      - name: Build APK
-        shell: bash
-        run: |
-          cd "$ANDROID_DIR"
-          chmod +x gradlew
+          .ci/android/build.sh \
+            -r \
+            -t standard \
+            -b "${{ inputs.build_type }}"
 
-          set -o pipefail
-
-          ./gradlew assemble${{ github.event.inputs.build_type }} \
-            --no-daemon \
-            --stacktrace \
-            --info \
-            --console=plain \
-            2>&1 | tee "$GITHUB_WORKSPACE/build-full.log"
-
-      - name: Upload APK
+      - name: Upload APK and AAB
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Lichii-Android-APK
+          name: Lichii-Android-ARM64
           path: |
-            **/build/outputs/apk/**/*.apk
+            artifacts/*.apk
+            artifacts/*.aab
           if-no-files-found: error
 
       - name: Upload diagnostic logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Android-Build-Diagnostics
-          path: build-full.log
+          name: Lichii-Build-Logs
+          path: |
+            src/android/build/
+            src/android/app/build/
+            artifacts/
           if-no-files-found: warn
