@@ -26,6 +26,10 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Update and Fix Code Submodules
+        run: |
+          git submodule update --init --recursive --force
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
