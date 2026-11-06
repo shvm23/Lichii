@@ -26,6 +26,15 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Map Repository Directories
+        run: |
+          echo "=== ROOT DIRECTORY ==="
+          ls -R
+          echo "=== SEARCHING FOR GRADLEW ==="
+          find . -name "gradlew"
+          echo "=== SEARCHING FOR BUILD SCRIPTS ==="
+          find . -name "*.sh"
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -35,19 +44,6 @@ jobs:
       - name: Accept Pre-installed Android SDK Licenses
         run: |
           yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
-
-      - name: Execute Native Platform Compiler
-        run: |
-          cd .ci/android || cd src/.ci/android || cd .
-          chmod +x build.sh || true
-          ./build.sh ${{ github.event.inputs.build_type }}
-
-      - name: Upload APK Artifact
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Lichii-Android-APK
-          path: "**/build/outputs/apk/**/*.apk"
 
       - name: Upload diagnostic logs on failure
         if: failure()
