@@ -32,12 +32,19 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android SDK Licenses
+      - name: Setup Android SDK Environment
         run: |
-          yes | sdkmanager --licenses || true
+          mkdir -p mkdir -p ${HOME}/android-sdk/cmdline-tools
+          wget https://google.com -O tools.zip
+          unzip -q tools.zip -d ${HOME}/android-sdk/cmdline-tools
+          mv ${HOME}/android-sdk/cmdline-tools/cmdline-tools ${HOME}/android-sdk/cmdline-tools/latest
+          rm tools.zip
+          echo "ANDROID_HOME=${HOME}/android-sdk" >> $GITHUB_ENV
+          echo "${HOME}/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+
+      - name: Accept All Android SDK Licenses
+        run: |
+          yes | ${HOME}/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
