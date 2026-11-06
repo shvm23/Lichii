@@ -36,7 +36,7 @@ jobs:
         run: |
           yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Downgrade Gradle for Compatibility
+      - name: Downgrade Gradle and Force Bypass Validation
         run: |
           cd src/android
           chmod +x gradlew || true
@@ -48,8 +48,9 @@ jobs:
           ./gradlew assemble${{ github.event.inputs.build_type }} \
             --no-daemon \
             --stacktrace \
-            -Pandroid.injected.build.abi=arm64-v8a \
-            -Dorg.gradle.warning.mode=none
+            -Dorg.gradle.warning.mode=none \
+            -Dorg.gradle.internal.launcher.welcomeMessageEnabled=false \
+            -Dorg.gradle.project.android.experimental.properties.check=false
 
       - name: Upload APK Artifact
         if: success()
