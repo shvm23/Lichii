@@ -1,0 +1,114 @@
+name: android-apk
+
+# Builds the Android app in src/android (arm64-v8a, "mainline" flavor) and uploads the APK.
+# Run it by hand from the Actions tab. To also attach the APK to an existing release (for example
+# build-88), put that tag in "release_tag".
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: Gradle build type
+        type: choice
+        options:
+          - Release
+          - RelWithDebInfo
+          - Debug
+        default: Release
+      release_tag:
+        description: Attach the APK to this existing release tag (leave empty to only upload an artifact)
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Android arm64 APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      # The native build, the NDK and the Gradle caches need several tens of GB.
+      - name: Free disk space
+        shell: bash
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk/ndk /opt/ghc /usr/local/share/boost
+          df -h /
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Installs the Android SDK command-line tools and accepts the licenses, so Gradle can fetch
+      # the NDK (ndkVersion) and CMake (3.31.5) pinned in src/android/app/build.gradle.kts.
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Restore CPM downloads
+        id: cpm-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .cache/cpm
+          key: cpm-android-v1-${{ hashFiles('cpmfile.json', 'CMakeLists.txt', 'CMakeModules/CPM*.cmake', 'externals/**/CMakeLists.txt', 'src/**/CMakeLists.txt') }}
+          restore-keys: |
+            cpm-android-v1-
+
+      - name: Build APK
+        shell: bash
+        env:
+          # Optional: set these repository secrets to sign with your own key. Without them the
+          # APK is signed with the debug keystore in src/android/app, which is fine for sideloading.
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          chmod +x .ci/android/build.sh
+          .ci/android/build.sh -t standard -b "${{ inputs.build_type }}"
+
+      - name: Save CPM downloads
+        if: steps.cpm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: .cache/cpm
+          key: ${{ steps.cpm-cache.outputs.cache-primary-key }}
+
+      - name: Name the APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -l artifacts
+          apk=$(ls artifacts/*.apk | head -n 1)
+          cp "$apk" "artifacts/lichii-android-arm64.apk"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: lichii-android-arm64-${{ github.sha }}
+          path: artifacts/lichii-android-arm64.apk
+          if-no-files-found: error
+
+      - name: Attach APK to release
+        if: inputs.release_tag != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload "${{ inputs.release_tag }}" artifacts/lichii-android-arm64.apk --clobber
