@@ -39,11 +39,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build APK with Verbose Error Logging
+      - name: Build APK with Compatibility Parameters
         run: |
           cd src/android || cd android || cd .
           chmod +x gradlew || true
-          ./gradlew assemble${{ github.event.inputs.build_type }} --stacktrace --info
+          ./gradlew assemble${{ github.event.inputs.build_type }} \
+            --stacktrace \
+            -Dorg.gradle.warning.mode=none \
+            -Dorg.gradle.internal.launcher.welcomeMessageEnabled=false
 
       - name: Upload APK Artifact
         if: success()
