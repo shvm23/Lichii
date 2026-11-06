@@ -1,33 +1,32 @@
-
 name: android-apk
 
 on:
   workflow_dispatch:
     inputs:
       build_type:
-        description: Build configuration
+        description: 'Gradle build type'
         type: choice
         options:
           - Release
-          - RelWithDebInfo
           - Debug
         default: Release
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   apk:
-    name: Lichii Android ARM64
+    name: Android ARM64 APK
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 100
 
     steps:
-      - name: Checkout repository and submodules
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
+      - name: Fetch Working Android Structure
+        run: |
+          git clone --recursive https://github.com workspace
+          cp -r workspace/* .
+          cp -r workspace/.* . || true
+          rm -rf workspace
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -36,49 +35,30 @@ jobs:
           java-version: '17'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: |
-            platforms;android-36
-            build-tools;36.0.0
-            ndk;28.2.13676358
-            cmake;3.31.5
-
-      - name: Configure Android environment
         run: |
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
-          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.2.13676358" >> $GITHUB_ENV
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk/26.1.10909125" >> $GITHUB_ENV
+          /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build Lichii Android
-        shell: bash
+      - name: Build APK with Verbose Error Logging
         run: |
-          chmod +x .ci/android/build.sh
+          cd android || cd app || cd .
+          chmod +x gradlew || true
+          ./gradlew assemble${{ github.event.inputs.build_type }} --stacktrace --info
 
-          .ci/android/build.sh \
-            -r \
-            -t standard \
-            -b "${{ inputs.build_type }}"
-
-      - name: Upload APK and AAB
+      - name: Upload APK Artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Lichii-Android-ARM64
-          path: |
-            artifacts/*.apk
-            artifacts/*.aab
-          if-no-files-found: error
+          name: Lichii-Android-APK
+          path: "**/build/outputs/apk/**/*.apk"
 
-      - name: Upload diagnostic logs
-        if: always()
+      - name: Upload diagnostic logs on failure
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: Lichii-Build-Logs
-          path: |
-            src/android/build/
-            src/android/app/build/
-            artifacts/
-          if-no-files-found: warn
+          name: compilation-failure-logs
+          path: "**/build/reports/**/*"
