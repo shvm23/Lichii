@@ -36,21 +36,15 @@ jobs:
         run: |
           yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Downgrade Gradle and Force Bypass Validation
+      - name: Compile Application Layout
         run: |
           cd src/android
           chmod +x gradlew || true
-          ./gradlew wrapper --gradle-version 8.4 --distribution-type bin
-
-      - name: Compile Native Android Application
-        run: |
-          cd src/android
           ./gradlew assemble${{ github.event.inputs.build_type }} \
             --no-daemon \
             --stacktrace \
-            -Dorg.gradle.warning.mode=none \
-            -Dorg.gradle.internal.launcher.welcomeMessageEnabled=false \
-            -Dorg.gradle.project.android.experimental.properties.check=false
+            -Dorg.gradle.project.android.experimental.properties.check=false \
+            -Pandroid.experimental.properties.check=false
 
       - name: Upload APK Artifact
         if: success()
