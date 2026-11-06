@@ -36,17 +36,11 @@ jobs:
         run: |
           yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Build APK with Compatibility Parameters
+      - name: Execute Native Platform Compiler
         run: |
-          cd src/android || cd android || cd .
-          chmod +x gradlew || true
-          ./gradlew assemble${{ github.event.inputs.build_type }} \
-            --stacktrace \
-            -Dorg.gradle.warning.mode=none \
-            -Dorg.gradle.internal.launcher.welcomeMessageEnabled=false
+          cd .ci/android || cd src/.ci/android || cd .
+          chmod +x build.sh || true
+          ./build.sh ${{ github.event.inputs.build_type }}
 
       - name: Upload APK Artifact
         if: success()
